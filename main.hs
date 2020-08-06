@@ -17,9 +17,14 @@ data Patt
   | VarP String
   deriving (Show)
 
+data Stmt
+  = SetDelayed Patt Expr
+  deriving (Show)
+
 data Disp
   = DispExpr Expr
   | DispPatt Patt
+  | DispStmt Stmt
 
 instance Show Disp where
   show (DispExpr (Num n)) = show n
@@ -31,6 +36,8 @@ instance Show Disp where
   show (DispPatt (VarP v)) = v ++ "_"
   show (DispPatt (ConsP hd tl)) =
     show (toDisp hd) ++ "[" ++ intercalate ", " (map (show . toDisp) tl) ++ "]"
+  show (DispStmt (SetDelayed p e)) =
+    show (toDisp p) ++ " := " ++ show (toDisp e)
 
 class ToDisp a where
   toDisp :: a -> Disp
@@ -41,6 +48,8 @@ instance ToDisp Expr where
 instance ToDisp Patt where
   toDisp = DispPatt
 
+instance ToDisp Stmt where
+  toDisp = DispStmt
 
 type Bindings = [(String, Expr)]
 
@@ -130,6 +139,12 @@ separatedList :: Parser sep -> Parser a -> Parser [a]
 separatedList sep val =
   separatedNonemptyList sep val <|> pure []
 
+stmt :: Parser Stmt
+stmt = do p <- pattern
+          _ <- symbol ":="
+          e <- expr
+          return $ SetDelayed p e
+
 parseAll :: Show a => Parser a -> String -> Either String a
 parseAll p i =
   case parse p i of
@@ -161,4 +176,5 @@ main = do
   printParse expr "Plus[1, x]"
   printParse expr "Function[x, x][1]"
   printParse expr "asdg]"
+  printParse stmt "Plus[x_, y_] := PrimitivePlus[x, y]"
   putStrLn "DONE."
