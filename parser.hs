@@ -3,6 +3,7 @@ module Parser (module Parser) where
 import Parse (Parser, integer, identifier, char, parse, symbol)
 import Ast
 import Control.Applicative
+import Data.Maybe (fromJust)
 
 atomicExpr :: Parser Expr
 atomicExpr = Num <$> integer <|> Sym <$> identifier
@@ -71,11 +72,14 @@ separatedList :: Parser sep -> Parser a -> Parser [a]
 separatedList sep val =
   separatedNonemptyList sep val <|> pure []
 
-stmt :: Parser Stmt
-stmt = do p <- pattern
+rule :: Parser Rule
+rule = do p <- pattern
           _ <- symbol ":="
           e <- expr
           return $ SetDelayed p e
+
+stmt :: Parser Stmt
+stmt = Rule <$> rule
 
 parseAll :: Show a => Parser a -> String -> Either String a
 parseAll p i =
@@ -89,3 +93,9 @@ printParse p i =
   case parseAll p i of 
        Right x -> print (toDisp x)
        Left err -> putStrLn err
+
+parsePanic :: Show a => Parser a -> String -> a
+parsePanic p i =
+  case parseAll p i of
+    Right x -> x
+    Left err -> error err

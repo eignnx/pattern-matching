@@ -15,8 +15,18 @@ data Patt
   | VarP String
   deriving (Show)
 
-data Stmt
+type Bindings = [(String, Expr)]
+
+data Rule
   = SetDelayed Patt Expr
+  | PrimitiveRule Patt (Bindings -> Expr)
+
+instance Show Rule where
+  show (SetDelayed p e) = "(SetDelayed $ " ++ show p ++ " $ " ++ show e ++ ")"
+  show (PrimitiveRule p f) = "(PrimitiveRule $ " ++ show p ++ " $ {...})"
+
+data Stmt
+  = Rule Rule
   deriving (Show)
 
 data Disp
@@ -34,8 +44,10 @@ instance Show Disp where
   show (DispPatt (VarP v)) = v ++ "_"
   show (DispPatt (ConsP hd tl)) =
     show (toDisp hd) ++ "[" ++ intercalate ", " (map (show . toDisp) tl) ++ "]"
-  show (DispStmt (SetDelayed p e)) =
+  show (DispStmt (Rule (SetDelayed p e))) =
     show (toDisp p) ++ " := " ++ show (toDisp e)
+  show (DispStmt (Rule (PrimitiveRule p f))) =
+    show (toDisp p) ++ " := {primitive rule body}"
 
 class ToDisp a where
   toDisp :: a -> Disp
@@ -48,3 +60,7 @@ instance ToDisp Patt where
 
 instance ToDisp Stmt where
   toDisp = DispStmt
+
+instance ToDisp a => ToDisp (Maybe a) where
+  toDisp (Just x) = toDisp x
+  toDisp Nothing = error "expected Just, got nothing in toDisp!"

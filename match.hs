@@ -3,8 +3,6 @@ module Match (module Match) where
 import Data.List (lookup)
 import Ast
 
-type Bindings = [(String, Expr)]
-
 match :: Bindings
       -> Patt
       -> Expr
