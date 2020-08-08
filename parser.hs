@@ -4,6 +4,7 @@ import Parse (Parser, integer, identifier, char, parse, symbol)
 import Ast
 import Control.Applicative
 import Data.Maybe (fromJust)
+import Data.List (uncons)
 
 atomicExpr :: Parser Expr
 atomicExpr = Num <$> integer <|> Sym <$> identifier
@@ -11,32 +12,21 @@ atomicExpr = Num <$> integer <|> Sym <$> identifier
 expr :: Parser Expr
 expr = (do hd <- atomicExpr
            argGroups <- some arguments
-           let ag1 = head argGroups
-           let ags = tail argGroups
-           return $ foldl Cons (Cons hd ag1) ags)
+           let (ag:ags) = argGroups
+           return $ foldl Cons (Cons hd ag) ags)
       <|> atomicExpr
 
 arguments :: Parser [Expr]
-arguments =
-  do _ <- symbol "["
-     args <- separatedList (symbol ",") expr
-     _ <- symbol "]"
-     return args
-
-consExprRest :: Parser (Expr -> Expr)
-consExprRest =
-  do _ <- symbol "["
-     args <- separatedList (symbol ",") expr
-     _ <- symbol "]"
-     return $ \hd -> Cons hd args
+arguments = symbol "[" *> separatedList (symbol ",") expr <* symbol "]"
 
 pattern :: Parser Patt
-pattern = num <|> identHeaded <|> sym where
-  num = (NumP <$> integer)
-  identHeaded = do ident <- identifier
-                   partial <- varIdentRest <|> consIdentRest
-                   return $ partial ident
-  sym = SymP <$> identifier
+pattern = num <|> identHeaded <|> sym
+  where
+    num = (NumP <$> integer)
+    identHeaded = do ident <- identifier
+                     partial <- varIdentRest <|> consIdentRest
+                     return $ partial ident
+    sym = SymP <$> identifier
 
 consPatternRest :: Parser (Patt -> Patt)
 consPatternRest =
@@ -56,17 +46,10 @@ varIdentRest =
      return $ \ident -> VarP ident
 
 separatedNonemptyList :: Parser sep -> Parser a -> Parser [a]
-separatedNonemptyList sep val =
-  postfixComma <|> infixComma where
-    commaValPair = do _sep <- sep
-                      v <- val
-                      return v
-    infixComma = do first <- val
-                    rest <- many commaValPair
-                    return (first:rest)
-    postfixComma = do vals <- infixComma
-                      _sep <- sep
-                      return vals
+separatedNonemptyList sep val = postfixComma <|> infixComma
+  where
+    infixComma = (:) <$> val <*> (many (sep *> val))
+    postfixComma = infixComma <* sep
 
 separatedList :: Parser sep -> Parser a -> Parser [a]
 separatedList sep val =
